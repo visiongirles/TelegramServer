@@ -11,7 +11,7 @@ const server = http.createServer(app);
 const webSocketServer = new WebSocketServer({ server });
 // const webSocketServer = new Server({ port: PORT_WEBSOCKET });
 
-var clients = new Array();
+let clients = new Array();
 
 // this runs after the http server successfully starts:
 function serverStart() {
@@ -31,7 +31,7 @@ function handleClient(thisClient, request) {
     // when a client closes its connection
     // get the client's position in the array
     // and delete it from the array:
-    var position = clients.indexOf(thisClient);
+    let position = clients.indexOf(thisClient);
     clients.splice(position, 1);
     console.log('connection closed');
   }
