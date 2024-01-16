@@ -3,7 +3,7 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pool } from './connection';
+import { pool } from './connection.js';
 // import url from 'node:url';
 
 import { dirname } from 'path';
@@ -51,6 +51,8 @@ websocketServer.on('connection', function connection(ws, request) {
       }
 
       console.log('Query result:', result.rows);
+      const json = JSON.stringify(result.rows);
+      ws.send(json);
     });
 
     // console.log(`Received message '${data}' from user`);
@@ -61,7 +63,6 @@ websocketServer.on('connection', function connection(ws, request) {
     // const filePath = './data/messanger.json';
     // './data/chatOne.json'
     // const messanger = fs.readFileSync(filePath, { encoding: 'utf8' });
-    ws.send(result.rows);
     // ws.send(messanger);
     // const response = { event: 'chat-message', payload: { messages } };
     // ws.send(response);
