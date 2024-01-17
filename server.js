@@ -17,9 +17,9 @@ const port = process.env.PORT || 3000;
 
 const server = app.listen(port, () => {
   console.log('Server is listening');
-  if (process.send) {
-    process.send(`Server running at http://localhost:${port}\n\n`);
-  }
+  // if (process.send) {
+  //   process.send(`Server running at http://localhost:${port}\n\n`);
+  // }
 });
 
 const websocketServer = new WebSocketServer({
@@ -36,14 +36,15 @@ server.on('upgrade', (request, socket, head) => {
 websocketServer.on('connection', function connection(ws, request) {
   ws.on('error', console.error);
   ws.on('message', function message(data) {
-    const requestChatsPreview = `select m.id, m.message, chat_id, u.username 
+    const requestChatsPreview = `select m.id, m.txt, m.chat_id, m.status, m.date, u.username, u.photo 
     from 
     (
-        select distinct on (chat_id) chat_id, id, author_id, message
+        select distinct on (chat_id) chat_id, id, author_id, txt, status, date
         from messages
         order by chat_id, date desc
     ) as m
-    left join users u on m.author_id = u.id;`;
+    inner join chats c on c.id = m.chat_id
+    inner join users u on c.owner_id = u.id;`;
     pool.query(requestChatsPreview, (err, result) => {
       if (err) {
         console.error('Error executing query', err);

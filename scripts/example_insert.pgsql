@@ -8,9 +8,7 @@ INSERT INTO users (username, status, photo) VALUES ('Капитан Чеснок
 INSERT INTO chats (owner_id) VALUES (2);
 INSERT INTO chats (owner_id) VALUES (3);
 
-
-DELETE FROM messages;
-INSERT INTO messages (chat_id, date, author_id, message, status) VALUES (1, 1702033343, 2, 'Привет, любители мурлыкающих созданий! Как ваш кот сегодня?', 2);
-INSERT INTO messages (chat_id, date, author_id, message, status) VALUES (1, 1703033343, 1, 'Мой кот вчера залез на верхнюю полку и теперь не может спуститься. Стоит ли мне купить ему карту?', 2);
-INSERT INTO messages (chat_id, date, author_id, message, status) VALUES (2, 1700033343, 3, 'Капитан, я потерял свой трезубец. Возможно, он прячется в пучине моего пальто.', 2);
-INSERT INTO messages (chat_id, date, author_id, message, status) VALUES (2, 1703033343, 1, 'Трезубец в пальто?! Какой чудной путь выбрал он для своих приключений!', 0);
+INSERT INTO messages (chat_id, date, author_id, txt, status) VALUES (1, 1702033300, 2, 'Привет, любители мурлыкающих созданий! Как ваш кот сегодня?', 2);
+INSERT INTO messages (chat_id, date, author_id, txt, status) VALUES (1, 1703033341, 1, 'Мой кот вчера залез на верхнюю полку и теперь не может спуститься. Стоит ли мне купить ему карту?', 2);
+INSERT INTO messages (chat_id, date, author_id, txt, status) VALUES (2, 1700033302, 3, 'Капитан, я потерял свой трезубец. Возможно, он прячется в пучине моего пальто.', 2);
+INSERT INTO messages (chat_id, date, author_id, txt, status) VALUES (2, 1702033343, 1, 'Трезубец в пальто?! Какой чудной путь выбрал он для своих приключений!', 0);

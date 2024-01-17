@@ -10,12 +10,3 @@ const config = {
 };
 
 export const pool = new Pool(config);
-
-pool.query('SELECT * FROM users', (err, result) => {
-  if (err) {
-    console.error('Error executing query', err);
-    return;
-  }
-
-  console.log('Query result:', result.rows);
-});
