@@ -1,25 +1,12 @@
-import http from 'http';
 import express from 'express';
 import { WebSocketServer } from 'ws';
-import fs from 'node:fs';
-import path from 'node:path';
 import { pool } from './connection.js';
-// import url from 'node:url';
-
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-// const dirnameSomething = dirname(fileURLToPath(import.meta.url)); // /path/spmething/
-// const filenameSomething = fileURLToPath(import.meta.url); // server.json
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 const server = app.listen(port, () => {
   console.log('Server is listening');
-  // if (process.send) {
-  //   process.send(`Server running at http://localhost:${port}\n\n`);
-  // }
 });
 
 const websocketServer = new WebSocketServer({
@@ -36,48 +23,111 @@ server.on('upgrade', (request, socket, head) => {
 websocketServer.on('connection', function connection(ws, request) {
   ws.on('error', console.error);
   ws.on('message', function message(data) {
-    const requestChatsPreview = `select m.id, m.txt, m.chat_id, m.status, m.date, u.username, u.photo 
-    from 
-    (
-        select distinct on (chat_id) chat_id, id, author_id, txt, status, date
-        from messages
-        order by chat_id, date desc
-    ) as m
-    inner join chats c on c.id = m.chat_id
-    inner join users u on c.owner_id = u.id;`;
-    pool.query(requestChatsPreview, (err, result) => {
-      if (err) {
-        console.error('Error executing query', err);
-        return;
+    const request = JSON.parse(data);
+
+    switch (request.type) {
+      case 'get-chats-preview': {
+        const requestChatsPreview = `select m.id, m.txt, m.chat_id, m.status, m.date, u.username, u.photo 
+        from 
+        (
+            select distinct on (chat_id) chat_id, id, author_id, txt, status, date
+            from messages
+            order by chat_id, date desc
+        ) as m
+        inner join chats c on c.id = m.chat_id
+        inner join users u on c.owner_id = u.id;`;
+        pool.query(requestChatsPreview, (err, result) => {
+          if (err) {
+            console.error('Error executing query', err);
+            return;
+          }
+
+          // console.log('Query result:', result.rows);
+          const object = {
+            type: request.type,
+            id: request.id,
+            chatsPreview: result.rows,
+          };
+          const json = JSON.stringify(object);
+          // console.log(json);
+          ws.send(json);
+        });
+        break;
       }
+      case 'get-chat-by-id': {
+        const requestChatById =
+          `select m.id, m.txt, m.status, m.chat_id, u.username, m.date 
+        from messages as m 
+        left join users u on m.author_id = u.id
+        where m.chat_id = ` +
+          request.chatId +
+          ';';
+        pool.query(requestChatById, (err, result) => {
+          if (err) {
+            console.error('Error executing query', err);
+            return;
+          }
 
-      console.log('Query result:', result.rows);
-      const json = JSON.stringify(result.rows);
-      ws.send(json);
-    });
+          console.log('Query result:', result.rows);
+          const object = {
+            id: request.id,
+            type: request.type,
+            messages: result.rows,
+          };
+          // const object = { chatsPreview: result.rows, id: request.id };
+          const json = JSON.stringify(object);
+          // console.log(json);
+          ws.send(json);
+        });
+        break;
+      }
+      case 'create-new-message': {
+        // const messageId = request.id;
+        const { chat_id, date, username, txt, status } = request;
+        const requestDeleteMessageById = `INSERT INTO messages 
+        (${chat_id}, ${date}, author_id, ${txt}, status) 
+        VALUES (1, 1702033300, 2, 'Привет, любители мурлыкающих созданий! Как ваш кот сегодня?', 2);
+        `;
+        pool.query(requestDeleteMessageById, (err, result) => {
+          if (err) {
+            console.error('Error executing query', err);
+            return;
+          }
 
-    // console.log(`Received message '${data}' from user`);
-    // const filePath = path.resolve(
-    //   dirname(fileURLToPath(import.meta.url)),
-    //   './data/messanger.json'
-    // );
-    // const filePath = './data/messanger.json';
-    // './data/chatOne.json'
-    // const messanger = fs.readFileSync(filePath, { encoding: 'utf8' });
-    // ws.send(messanger);
-    // const response = { event: 'chat-message', payload: { messages } };
-    // ws.send(response);
-    // console.log(response);
+          // console.log('Query result:', result.rows);
+          const object = {
+            type: request.type,
+            id: request.id,
+            chatsPreview: result.rows,
+          };
+          const json = JSON.stringify(object);
+          // console.log(json);
+          ws.send(json);
+        });
+        break;
+      }
+      case 'delete-message-by-id': {
+        const messageId = request.id;
+        const chatId = request.chatId;
+        const requestDeleteMessageById = `DELETE FROM messeges WHERE id=${messageId} AND chat_id=${chatId}`;
+        pool.query(requestDeleteMessageById, (err, result) => {
+          if (err) {
+            console.error('Error executing query', err);
+            return;
+          }
+
+          // console.log('Query result:', result.rows);
+          const object = {
+            type: request.type,
+            id: request.id,
+            chatsPreview: result.rows,
+          };
+          const json = JSON.stringify(object);
+          // console.log(json);
+          ws.send(json);
+        });
+        break;
+      }
+    }
   });
 });
-
-// при коннекте тебе нужно положить ws-коннект куда-нибудь в список коннектов, при дисконнекте - удалять этот коннект..
-// на сообщении - бродкастить сообщение всем подключенным клиентам по списку
-
-// FROM client:  write new message
-// file.write(JSON.stringify(messages));
-
-// TO  client
-// const someMessage = JSON.parse(fileContent);
-
-// fs.writeFileSync(file, JSON.stringify(messages), { encoding: 'utf8' });
