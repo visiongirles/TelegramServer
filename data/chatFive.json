@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "date": 1703033343,
+    "created_at": 1703033343,
     "author": "Путешественник",
     "hasRead": true,
     "isMine": false,
@@ -9,7 +9,7 @@
   },
   {
     "id": 2,
-    "date": 1702033343,
+    "created_at": 1702033343,
     "author": "Любитель кофе",
     "hasRead": true,
     "isMine": true,

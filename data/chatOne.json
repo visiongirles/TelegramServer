@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "date": 1702033343,
+    "created_at": 1702033343,
     "author": "Max",
     "hasRead": true,
     "isMine": false,
@@ -9,7 +9,7 @@
   },
   {
     "id": 2,
-    "date": 1703033343,
+    "created_at": 1703033343,
     "author": "Kate",
     "hasRead": false,
     "isMine": true,
@@ -17,7 +17,7 @@
   },
   {
     "id": 3,
-    "date": 1704033343,
+    "created_at": 1704033343,
     "author": "Max",
     "hasRead": false,
     "isMine": true,

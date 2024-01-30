@@ -5,23 +5,36 @@ DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS chats;
 DROP TABLE IF EXISTS users;
 
+create type user_status as enum (
+  'Online',
+  'Offline'
+);
+
+
 CREATE TABLE users (
-    id        BIGSERIAL PRIMARY KEY,
+    id        SERIAL PRIMARY KEY,
     username  varchar(64) NOT NULL,
-    status    integer NOT NULL,
+    status    user_status NOT NULL,
     photo     varchar(256)
 );
 
 CREATE TABLE chats (
-    id        BIGSERIAL PRIMARY KEY,
-    owner_id  BIGINT references users(id)
+    id        SERIAL PRIMARY KEY,
+    owner_id  INT references users(id)
+);
+
+
+create type message_status as enum (
+  'hasRead',
+  'hasNotRead'
 );
 
 CREATE TABLE messages (
-    id        BIGSERIAL PRIMARY KEY,
-    chat_id   BIGINT references chats(id),
-    date      BIGINT NOT NULL,
-    author_id BIGINT references users(id),
+    id        SERIAL PRIMARY KEY,
+    chat_id   integer references chats(id),
+    created_at TIMESTAMP NOT NULL,
+    author_id integer references users(id),
     txt       text NOT NULL,
-    status    integer NOT NULL
+    status    message_status NOT NULL
 );
+

@@ -27,12 +27,12 @@ websocketServer.on('connection', function connection(ws, request) {
 
     switch (request.type) {
       case 'get-chats-preview': {
-        const requestChatsPreview = `select m.id, m.txt, m.chat_id, m.status, m.date, u.username, u.photo 
+        const requestChatsPreview = `select m.id, m.txt, m.chat_id, m.status, m.created_at, u.username, u.photo 
         from 
         (
-            select distinct on (chat_id) chat_id, id, author_id, txt, status, date
+            select distinct on (chat_id) chat_id, id, author_id, txt, status, created_at
             from messages
-            order by chat_id, date desc
+            order by chat_id, created_at desc
         ) as m
         inner join chats c on c.id = m.chat_id
         inner join users u on c.owner_id = u.id;`;
@@ -42,33 +42,32 @@ websocketServer.on('connection', function connection(ws, request) {
             return;
           }
 
-          // console.log('Query result:', result.rows);
           const object = {
             type: request.type,
             id: request.id,
             chatsPreview: result.rows,
           };
           const json = JSON.stringify(object);
-          // console.log(json);
           ws.send(json);
         });
         break;
       }
       case 'get-chat-by-id': {
+        const values = [request.chatId];
         const requestChatById =
-          `select m.id, m.txt, m.status, m.chat_id, u.username, m.date 
+          `select m.id, m.txt, m.status, m.chat_id, u.username, m.created_at 
         from messages as m 
         left join users u on m.author_id = u.id
-        where m.chat_id = ` +
-          request.chatId +
-          ';';
-        pool.query(requestChatById, (err, result) => {
+        where m.chat_id = $1
+        ORDER BY m.created_at asc;`
+
+        pool.query(requestChatById, values, (err, result) => {
           if (err) {
             console.error('Error executing query', err);
             return;
           }
 
-          console.log('Query result:', result.rows);
+          // console.log('Query result [requestChatById]:', result.rows);
           const object = {
             id: request.id,
             type: request.type,
@@ -82,28 +81,29 @@ websocketServer.on('connection', function connection(ws, request) {
         break;
       }
       case 'create-new-message': {
-        // const messageId = request.id;
-        const { chat_id, date, username, txt, status } = request;
-        const requestDeleteMessageById = `INSERT INTO messages 
-        (${chat_id}, ${date}, author_id, ${txt}, status) 
-        VALUES (1, 1702033300, 2, 'Привет, любители мурлыкающих созданий! Как ваш кот сегодня?', 2);
-        `;
-        pool.query(requestDeleteMessageById, (err, result) => {
+        const values = [request.message.chat_id, 1, request.message.txt];
+        const requestCreateNewMessage = `INSERT INTO messages (chat_id, created_at, author_id, txt, status)
+        VALUES ($1, now(), $2, $3, 0) RETURNING *;`
+
+        pool.query(requestCreateNewMessage, values, (err, result) => {
           if (err) {
             console.error('Error executing query', err);
             return;
           }
-
-          // console.log('Query result:', result.rows);
+ 
+                  
           const object = {
-            type: request.type,
             id: request.id,
-            chatsPreview: result.rows,
+            type: request.type,
+            message: result.rows[0],
           };
           const json = JSON.stringify(object);
-          // console.log(json);
           ws.send(json);
         });
+
+
+
+
         break;
       }
       case 'delete-message-by-id': {
@@ -120,7 +120,7 @@ websocketServer.on('connection', function connection(ws, request) {
           const object = {
             type: request.type,
             id: request.id,
-            chatsPreview: result.rows,
+            deletedMessage: {messageId, chatId},
           };
           const json = JSON.stringify(object);
           // console.log(json);

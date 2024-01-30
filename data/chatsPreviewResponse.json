@@ -4,7 +4,7 @@
     "photo": "https://gameguru.ru/clf/44/04/c0/01/news.1610973258596.jpg",
     "lastMessage": {
       "id": 3,
-      "date": 1704033343,
+      "created_at": 1704033343,
       "author": "Max",
       "hasRead": false,
       "isMine": true,
@@ -16,7 +16,7 @@
     "photo": "https://sun9-58.userapi.com/impf/c845524/v845524992/117955/E_B_jAs7RdI.jpg?size=901x911&quality=96&sign=574945e12af151018fa1c6e4372df78e&type=album",
     "lastMessage": {
       "id": 3,
-      "date": 1702033348,
+      "created_at": 1702033348,
       "author": "Капитан Чеснок",
       "hasRead": true,
       "isMine": false,
@@ -28,7 +28,7 @@
     "photo": "https://t4.ftcdn.net/jpg/05/62/99/31/360_F_562993122_e7pGkeY8yMfXJcRmclsoIjtOoVDDgIlh.jpg",
     "lastMessage": {
       "id": 3,
-      "date": 1702033348,
+      "created_at": 1702033348,
       "author": "Питоновед",
       "hasRead": true,
       "isMine": false,
@@ -40,7 +40,7 @@
     "photo": "https://i1.sndcdn.com/avatars-000600452151-38sfei-t500x500.jpg",
     "lastMessage": {
       "id": 3,
-      "date": 1702033348,
+      "created_at": 1702033348,
       "author": "Путешественник",
       "hasRead": true,
       "isMine": false,
@@ -52,7 +52,7 @@
     "photo": "https://i.pinimg.com/736x/cb/6a/e7/cb6ae765d1d08d8bb7b105cd931ea20d.jpg",
     "lastMessage": {
       "id": 2,
-      "date": 1702033343,
+      "created_at": 1702033343,
       "author": "Любитель кофе",
       "hasRead": true,
       "isMine": true,
