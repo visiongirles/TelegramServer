@@ -34,10 +34,8 @@ const server = app.listen(port, () => {
 
 // check authorization
 app.post('/auth', express.json(), (req, res) => {
-  // console.log(req.body.username === username);
-  // console.log(req.body.password === password);
-
   if (req.body.username === username && req.body.password === password) {
+    console.log('authorization is changed');
     authorization = true;
     res.status(200).send({});
   } else {
@@ -52,10 +50,7 @@ const websocketServer = new WebSocketServer({
 
 server.on('upgrade', (request, socket, head) => {
   console.log('UPGRADE');
-  console.log('request', request);
-  console.log('socket', socket);
-  console.log('head', head);
-  if (authorization && socketUpgradeURL) {
+  if (authorization) {
     websocketServer.handleUpgrade(request, socket, head, (websocket) => {
       websocketServer.emit('connection', websocket, request);
     });
@@ -108,15 +103,12 @@ websocketServer.on('connection', function connection(ws, request) {
             return;
           }
 
-          // console.log('Query result [requestChatById]:', result.rows);
           const object = {
             id: request.id,
             type: request.type,
             messages: result.rows,
           };
-          // const object = { chatsPreview: result.rows, id: request.id };
           const json = JSON.stringify(object);
-          // console.log(json);
           ws.send(json);
         });
         break;
@@ -158,14 +150,12 @@ websocketServer.on('connection', function connection(ws, request) {
             return;
           }
 
-          // console.log('Query result:', result.rows);
           const object = {
             type: request.type,
             id: request.id,
             deletedMessage: { messageId, chatId },
           };
           const json = JSON.stringify(object);
-          // console.log(json);
           ws.send(json);
         });
         break;
