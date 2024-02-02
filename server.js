@@ -1,12 +1,48 @@
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { pool } from './connection.js';
+import cors from 'cors';
 
+// MOCK DATA
+const username = 'duckate';
+const password = '123';
+let authorization = false;
+const socketUpgradeURL = 'ws://localhost:3000/websockets';
+
+// create HTTP server
 const app = express();
+
+// setup port for listening
 const port = process.env.PORT || 3000;
 
+// allow CORS
+app.use(
+  cors({
+    origin: 'http://localhost:5173', // Разрешенный источник
+    methods: ['GET', 'POST'], // Разрешенные методы
+    allowedHeaders: ['Content-Type'], // Разрешенные заголовки
+    credentials: true, // Разрешение передачи куки и заголовков аутентификации через CORS
+  })
+);
+
+// app.use(express.json());
+
+//
 const server = app.listen(port, () => {
   console.log('Server is listening');
+});
+
+// check authorization
+app.post('/auth', express.json(), (req, res) => {
+  // console.log(req.body.username === username);
+  // console.log(req.body.password === password);
+
+  if (req.body.username === username && req.body.password === password) {
+    authorization = true;
+    res.status(200).send({});
+  } else {
+    res.status(401).end();
+  }
 });
 
 const websocketServer = new WebSocketServer({
@@ -15,9 +51,15 @@ const websocketServer = new WebSocketServer({
 });
 
 server.on('upgrade', (request, socket, head) => {
-  websocketServer.handleUpgrade(request, socket, head, (websocket) => {
-    websocketServer.emit('connection', websocket, request);
-  });
+  console.log('UPGRADE');
+  console.log('request', request);
+  console.log('socket', socket);
+  console.log('head', head);
+  if (authorization && socketUpgradeURL) {
+    websocketServer.handleUpgrade(request, socket, head, (websocket) => {
+      websocketServer.emit('connection', websocket, request);
+    });
+  }
 });
 
 websocketServer.on('connection', function connection(ws, request) {
@@ -54,12 +96,11 @@ websocketServer.on('connection', function connection(ws, request) {
       }
       case 'get-chat-by-id': {
         const values = [request.chatId];
-        const requestChatById =
-          `select m.id, m.txt, m.status, m.chat_id, u.username, m.created_at 
+        const requestChatById = `select m.id, m.txt, m.status, m.chat_id, u.username, m.created_at 
         from messages as m 
         left join users u on m.author_id = u.id
         where m.chat_id = $1
-        ORDER BY m.created_at asc;`
+        ORDER BY m.created_at asc;`;
 
         pool.query(requestChatById, values, (err, result) => {
           if (err) {
@@ -81,17 +122,21 @@ websocketServer.on('connection', function connection(ws, request) {
         break;
       }
       case 'create-new-message': {
-        const values = [request.message.chat_id, 1, request.message.txt];
+        const values = [
+          request.message.chat_id,
+          1,
+          request.message.txt,
+          'hasNotRead',
+        ];
         const requestCreateNewMessage = `INSERT INTO messages (chat_id, created_at, author_id, txt, status)
-        VALUES ($1, now(), $2, $3, 0) RETURNING *;`
+        VALUES ($1, now(), $2, $3, $4) RETURNING *;`;
 
         pool.query(requestCreateNewMessage, values, (err, result) => {
           if (err) {
             console.error('Error executing query', err);
             return;
           }
- 
-                  
+
           const object = {
             id: request.id,
             type: request.type,
@@ -100,9 +145,6 @@ websocketServer.on('connection', function connection(ws, request) {
           const json = JSON.stringify(object);
           ws.send(json);
         });
-
-
-
 
         break;
       }
@@ -120,7 +162,7 @@ websocketServer.on('connection', function connection(ws, request) {
           const object = {
             type: request.type,
             id: request.id,
-            deletedMessage: {messageId, chatId},
+            deletedMessage: { messageId, chatId },
           };
           const json = JSON.stringify(object);
           // console.log(json);
