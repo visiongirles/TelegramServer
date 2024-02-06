@@ -1,0 +1,20 @@
+export const requestChatsPreviewSQLRequest = `select m.id, m.txt, m.chat_id, m.status, m.created_at, u.username, u.photo 
+from 
+(
+    select distinct on (chat_id) chat_id, id, author_id, txt, status, created_at
+    from messages
+    order by chat_id, created_at desc
+) as m
+inner join chats c on c.id = m.chat_id
+inner join users u on c.owner_id = u.id;`;
+
+export const requestChatByIdSQLRequest = `select m.id, m.txt, m.status, m.chat_id, u.username, m.created_at 
+from messages as m 
+left join users u on m.author_id = u.id
+where m.chat_id = $1
+ORDER BY m.created_at asc;`;
+
+export const requestCreateNewMessageSQLRequest = `INSERT INTO messages (chat_id, created_at, author_id, txt, status)
+VALUES ($1, now(), $2, $3, $4) RETURNING *;`;
+
+export const requestDeleteMessageByIdSQLRequest = `DELETE FROM messages WHERE chat_id=$1 AND id=$2`;

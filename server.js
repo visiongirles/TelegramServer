@@ -2,11 +2,17 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { pool } from './connection.js';
 import cors from 'cors';
+import {
+  requestChatsPreviewSQLRequest,
+  requestChatByIdSQLRequest,
+  requestCreateNewMessageSQLRequest,
+  requestDeleteMessageByIdSQLRequest,
+} from './SQLRequests/index.js';
 
 // MOCK DATA
 const username = 'duckate';
 const password = '123';
-let authorization = false;
+let authorization = true;
 const socketUpgradeURL = 'ws://localhost:3000/websockets';
 
 // create HTTP server
@@ -25,17 +31,15 @@ app.use(
   })
 );
 
-// app.use(express.json());
-
-//
+// Start listening
 const server = app.listen(port, () => {
   console.log('Server is listening');
 });
 
-// check authorization
+// Check authorization
 app.post('/auth', express.json(), (req, res) => {
   if (req.body.username === username && req.body.password === password) {
-    console.log('authorization is changed');
+    console.log('authorization is changed to TRUE');
     authorization = true;
     res.status(200).send({});
   } else {
@@ -49,7 +53,7 @@ const websocketServer = new WebSocketServer({
 });
 
 server.on('upgrade', (request, socket, head) => {
-  console.log('UPGRADE');
+  console.log('Update to socket is made');
   if (authorization) {
     websocketServer.handleUpgrade(request, socket, head, (websocket) => {
       websocketServer.emit('connection', websocket, request);
@@ -57,107 +61,121 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-websocketServer.on('connection', function connection(ws, request) {
+// суть - создать слой с необходимым интерфейсом независящий от реализации протокола (ws в данном случае)
+// const user = connection;
+
+// можно сделать словарь
+// const requestDictionary = ['get-chats-preview', requestChatsPreview(..)]
+
+function sendData(data, ws) {
+  const json = JSON.stringify(data);
+  ws.send(json);
+}
+
+async function getChatsPreview() {
+  const requestChatsPreview = requestChatsPreviewSQLRequest;
+
+  try {
+    const result = await pool.query(requestChatsPreview);
+    return result.rows;
+  } catch (error) {
+    console.error('Error executing query', error);
+    return;
+  }
+}
+
+async function getChatById(chatId, ws) {
+  const values = [chatId];
+  const requestChatById = requestChatByIdSQLRequest;
+
+  try {
+    const result = await pool.query(requestChatById, values);
+
+    return result.rows;
+  } catch (error) {
+    console.error('Error executing query', err);
+    return;
+  }
+}
+
+async function createNewMessage(chat_id, txt) {
+  const values = [chat_id, 1, txt, 'hasNotRead'];
+
+  const requestCreateNewMessage = requestCreateNewMessageSQLRequest;
+
+  try {
+    const result = await pool.query(requestCreateNewMessage, values);
+    const object = {
+      message: result.rows[0],
+    };
+    return object;
+  } catch (error) {
+    console.error('Error executing query', error);
+    return;
+  }
+}
+
+async function deleteMessageById(chatId, messageId) {
+  const values = [chatId, messageId];
+  const requestDeleteMessageById = requestDeleteMessageByIdSQLRequest;
+
+  try {
+    await pool.query(requestDeleteMessageById, values);
+    const result = {
+      deletedMessage: {
+        messageId: messageId,
+        chatId: chatId,
+      },
+    };
+    return result;
+  } catch (error) {
+    console.error('Error executing query', error);
+  }
+}
+
+websocketServer.on('connection', function connection(ws) {
   ws.on('error', console.error);
-  ws.on('message', function message(data) {
+  ws.on('message', async function message(data) {
     const request = JSON.parse(data);
 
     switch (request.type) {
       case 'get-chats-preview': {
-        const requestChatsPreview = `select m.id, m.txt, m.chat_id, m.status, m.created_at, u.username, u.photo 
-        from 
-        (
-            select distinct on (chat_id) chat_id, id, author_id, txt, status, created_at
-            from messages
-            order by chat_id, created_at desc
-        ) as m
-        inner join chats c on c.id = m.chat_id
-        inner join users u on c.owner_id = u.id;`;
-        pool.query(requestChatsPreview, (err, result) => {
-          if (err) {
-            console.error('Error executing query', err);
-            return;
-          }
-
-          const object = {
-            type: request.type,
-            id: request.id,
-            chatsPreview: result.rows,
-          };
-          const json = JSON.stringify(object);
-          ws.send(json);
-        });
+        const result = await getChatsPreview();
+        const data = {
+          chatsPreview: [...result],
+          type: request.type,
+        };
+        sendData(data, ws);
         break;
       }
       case 'get-chat-by-id': {
-        const values = [request.chatId];
-        const requestChatById = `select m.id, m.txt, m.status, m.chat_id, u.username, m.created_at 
-        from messages as m 
-        left join users u on m.author_id = u.id
-        where m.chat_id = $1
-        ORDER BY m.created_at asc;`;
-
-        pool.query(requestChatById, values, (err, result) => {
-          if (err) {
-            console.error('Error executing query', err);
-            return;
-          }
-
-          const object = {
-            id: request.id,
-            type: request.type,
-            messages: result.rows,
-          };
-          const json = JSON.stringify(object);
-          ws.send(json);
-        });
+        const result = await getChatById(request.chatId, ws);
+        console.log(result);
+        const data = {
+          messages: [...result],
+          type: request.type,
+        };
+        sendData(data, ws);
         break;
       }
       case 'create-new-message': {
-        const values = [
+        const result = await createNewMessage(
           request.message.chat_id,
-          1,
-          request.message.txt,
-          'hasNotRead',
-        ];
-        const requestCreateNewMessage = `INSERT INTO messages (chat_id, created_at, author_id, txt, status)
-        VALUES ($1, now(), $2, $3, $4) RETURNING *;`;
+          request.message.txt
+        );
+        const data = {
+          message: { ...result.message },
+          type: request.type,
+        };
 
-        pool.query(requestCreateNewMessage, values, (err, result) => {
-          if (err) {
-            console.error('Error executing query', err);
-            return;
-          }
-
-          const object = {
-            id: request.id,
-            type: request.type,
-            message: result.rows[0],
-          };
-          const json = JSON.stringify(object);
-          ws.send(json);
-        });
-
+        sendData(data, ws);
         break;
       }
       case 'delete-message-by-id': {
-        const messageId = request.id;
-        const chatId = request.chatId;
-        const requestDeleteMessageById = `DELETE FROM messeges WHERE id=${messageId} AND chat_id=${chatId}`;
-        pool.query(requestDeleteMessageById, (err, result) => {
-          if (err) {
-            console.error('Error executing query', err);
-            return;
-          }
-
-          const object = {
-            type: request.type,
-            id: request.id,
-            deletedMessage: { messageId, chatId },
-          };
-          const json = JSON.stringify(object);
-          ws.send(json);
-        });
+        let result = await deleteMessageById(request.chatId, request.messageId);
+        // result.type = request.type;
+        const data = { ...result, type: request.type };
+        sendData(data, ws);
         break;
       }
     }
