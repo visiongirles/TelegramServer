@@ -2,18 +2,24 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { pool } from './connection.js';
 import cors from 'cors';
+import { createHash } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import {
   requestChatsPreviewSQLRequest,
   requestChatByIdSQLRequest,
   requestCreateNewMessageSQLRequest,
   requestDeleteMessageByIdSQLRequest,
+  requestCreateNewUserSQLRequest,
+  requestPasswordAndSaltSQLRequest,
 } from './SQLRequests/index.js';
 
 // MOCK DATA
-const username = 'duckate';
-const password = '123';
-let authorization = true;
+const EXPIRATION_PERIOD = 600;
+let authorization = false;
+const SECRET = 'secret';
 const socketUpgradeURL = 'ws://localhost:3000/websockets';
+
+//  URL_WEBSOCKET обычно вытаскивают в .env файлы, хороший тон ( на будущее)
 
 // create HTTP server
 const app = express();
@@ -36,14 +42,95 @@ const server = app.listen(port, () => {
   console.log('Server is listening');
 });
 
+// jwt-encode
+function createToken(userId) {
+  const token = jwt.sign(
+    {
+      exp: Date.now() + 60 * 1000,
+      user: {
+        userId,
+      },
+    },
+    SECRET
+  );
+  return token;
+}
+// TODO: перенести все настйроки в json файл
+// не пароли , а хэши паролей
+//  readFileSync('.env', {encoding: 'utf-8' }).split('\n').map(s => s.indexOf()s.split('=').map(([k, v]) => process.env[k] = v)
+
 // Check authorization
-app.post('/auth', express.json(), (req, res) => {
-  if (req.body.username === username && req.body.password === password) {
-    console.log('authorization is changed to TRUE');
+app.post('/auth', express.json(), async (req, res) => {
+  // 1. check hashed + salted password in request VS in database
+  // 2. OK -> token
+  const username = req.body.username;
+  const password = req.body.password;
+  console.log(
+    'username from Client: ',
+    username,
+    'password from Client:: ',
+    password
+  );
+  const values = [username];
+  const sqlRequest = requestPasswordAndSaltSQLRequest; // TODO: SQL salt && hasshed
+
+  //
+  try {
+    const result = await pool.query(sqlRequest, values);
+
+    const hashedPasswordFromDB = result.rows[0].password;
+    const salt = result.rows[0].salt;
+    const hashedPasswordFromUser = sha256(password + salt);
+    if (hashedPasswordFromUser === hashedPasswordFromDB) {
+      const userId = result.rows[0].id;
+      const token = createToken(userId);
+      console.log('authorization is changed to TRUE');
+      authorization = true;
+      res.status(200).send({ token: token });
+    } else {
+      throw Error;
+    }
+  } catch (error) {
+    res.status(401).end('Incorrect Login or Password');
+  }
+});
+
+app.post('/authByToken', express.json(), (req, res) => {
+  // TODO: проверить валидность токена
+  const token = req.body.token;
+  console.log(req.body.token);
+  try {
+    jwt.verify(token, SECRET);
     authorization = true;
-    res.status(200).send({});
-  } else {
-    res.status(401).end();
+    console.log('authorization is changed to TRUE');
+    res.status(200).send({ token: token });
+  } catch (err) {
+    res.status(401).end('Invalid token');
+  }
+});
+
+function sha256(content) {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+app.post('/register', express.json(), async (req, res) => {
+  // TODO: проверить валидность токена
+  const username = req.body.username;
+  const password = req.body.password;
+  const salt = Math.random();
+  const hashedPassword = sha256(password + salt);
+  const values = [username, hashedPassword, salt];
+  const sqlRequest = requestCreateNewUserSQLRequest;
+  try {
+    const result = await pool.query(sqlRequest, values);
+    const user = { userId: result.id }; // TODO: user_id
+    const token = createToken(user);
+    authorization = true;
+    console.log('[/register] authorization is changed to TRUE');
+    res.status(200).send({ token });
+    //
+  } catch (err) {
+    res.status(401).end('Login is occupied');
   }
 });
 
@@ -141,6 +228,7 @@ websocketServer.on('connection', function connection(ws) {
     switch (request.type) {
       case 'get-chats-preview': {
         const result = await getChatsPreview();
+        console.log(result);
         const data = {
           chatsPreview: [...result],
           type: request.type,
@@ -164,8 +252,9 @@ websocketServer.on('connection', function connection(ws) {
           request.message.txt
         );
         const data = {
-          message: { ...result.message },
           type: request.type,
+          chatId: request.message.chat_id,
+          message: { ...result.message },
         };
 
         sendData(data, ws);

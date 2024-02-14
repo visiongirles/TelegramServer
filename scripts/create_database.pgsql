@@ -2,6 +2,7 @@
 -- CREATE DATABASE telegram;
 
 DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS user_chats;
 DROP TABLE IF EXISTS chats;
 DROP TABLE IF EXISTS users;
 
@@ -15,14 +16,23 @@ CREATE TABLE users (
     id        SERIAL PRIMARY KEY,
     username  varchar(64) NOT NULL,
     status    user_status NOT NULL,
-    photo     varchar(256)
+    photo     varchar(255),
+    password varchar(255),
+    salt varchar(255)
 );
+
+
 
 CREATE TABLE chats (
     id        SERIAL PRIMARY KEY,
     owner_id  INT references users(id)
 );
 
+
+CREATE TABLE user_chats (
+    chat_id  INT references chats(id),
+    user_id  INT references users(id)
+);
 
 create type message_status as enum (
   'hasRead',
