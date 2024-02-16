@@ -14,10 +14,13 @@ import {
 } from './SQLRequests/index.js';
 
 // MOCK DATA
-const EXPIRATION_PERIOD = 600;
+const EXPIRATION_PERIOD = 60 * 60 * 48;
 let authorization = false;
 const SECRET = 'secret';
+const WRONG_SECRET = 'secret_WRONGGGGGG';
 const socketUpgradeURL = 'ws://localhost:3000/websockets';
+
+let webSocketConnection = new Map();
 
 //  URL_WEBSOCKET обычно вытаскивают в .env файлы, хороший тон ( на будущее)
 
@@ -44,20 +47,37 @@ const server = app.listen(port, () => {
 
 // jwt-encode
 function createToken(userId) {
+  const dateNow = Date.now();
   const token = jwt.sign(
     {
-      exp: Date.now() + 60 * 1000,
-      user: {
+      exp: Math.floor(Date.now() / 1000) + EXPIRATION_PERIOD, // in seconds
+      user_id: {
         userId,
       },
     },
     SECRET
   );
+  const exp = parseJwt(token).exp;
+  console.log('dateNow: ', dateNow, '[ createToken. exp: ]', exp);
+
   return token;
 }
 // TODO: перенести все настйроки в json файл
 // не пароли , а хэши паролей
 //  readFileSync('.env', {encoding: 'utf-8' }).split('\n').map(s => s.indexOf()s.split('=').map(([k, v]) => process.env[k] = v)
+
+// token parse
+function parseJwt(token) {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+}
+
+function addSocket(webSocket, userId) {
+  webSocketConnection.set(webSocket, userId);
+}
+
+function removeSocket(webSocket) {
+  webSocketConnection.delete(webSocket);
+}
 
 // Check authorization
 app.post('/auth', express.json(), async (req, res) => {
@@ -72,7 +92,7 @@ app.post('/auth', express.json(), async (req, res) => {
     password
   );
   const values = [username];
-  const sqlRequest = requestPasswordAndSaltSQLRequest; // TODO: SQL salt && hasshed
+  const sqlRequest = requestPasswordAndSaltSQLRequest; // TODO: SQL salt && hashed password
 
   //
   try {
@@ -85,6 +105,7 @@ app.post('/auth', express.json(), async (req, res) => {
       const userId = result.rows[0].id;
       const token = createToken(userId);
       console.log('authorization is changed to TRUE');
+
       authorization = true;
       res.status(200).send({ token: token });
     } else {
@@ -105,6 +126,7 @@ app.post('/authByToken', express.json(), (req, res) => {
     console.log('authorization is changed to TRUE');
     res.status(200).send({ token: token });
   } catch (err) {
+    console.log(err.message);
     res.status(401).end('Invalid token');
   }
 });
@@ -125,6 +147,7 @@ app.post('/register', express.json(), async (req, res) => {
     const result = await pool.query(sqlRequest, values);
     const user = { userId: result.id }; // TODO: user_id
     const token = createToken(user);
+
     authorization = true;
     console.log('[/register] authorization is changed to TRUE');
     res.status(200).send({ token });
@@ -147,6 +170,8 @@ server.on('upgrade', (request, socket, head) => {
     });
   }
 });
+
+// to check if broken = https://www.npmjs.com/package/ws#how-to-detect-and-close-broken-connections
 
 // суть - создать слой с необходимым интерфейсом независящий от реализации протокола (ws в данном случае)
 // const user = connection;
@@ -220,15 +245,24 @@ async function deleteMessageById(chatId, messageId) {
   }
 }
 
-websocketServer.on('connection', function connection(ws) {
+websocketServer.on('connection', function connection(ws, request) {
+  console.log('request: ', request);
   ws.on('error', console.error);
   ws.on('message', async function message(data) {
     const request = JSON.parse(data);
 
     switch (request.type) {
+      case 'set-token': {
+        const userId = jwt.verify(request.token, SECRET).user_id.userId;
+        console.log('[set-token]: ', userId);
+        addSocket(ws, userId);
+        console.log(webSocketConnection.keys());
+        break;
+      }
+
       case 'get-chats-preview': {
         const result = await getChatsPreview();
-        console.log(result);
+        // console.log(result);
         const data = {
           chatsPreview: [...result],
           type: request.type,
@@ -238,7 +272,7 @@ websocketServer.on('connection', function connection(ws) {
       }
       case 'get-chat-by-id': {
         const result = await getChatById(request.chatId, ws);
-        console.log(result);
+        // console.log(result);
         const data = {
           messages: [...result],
           type: request.type,
@@ -268,5 +302,9 @@ websocketServer.on('connection', function connection(ws) {
         break;
       }
     }
+  });
+  ws.on('close', function close() {
+    removeSocket(ws);
+    console.log('[Closed websocket: ]', webSocketConnection);
   });
 });
