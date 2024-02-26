@@ -1,0 +1,2 @@
+SELECT distinct on (user_chats.chat_id) user_chats.chat_id WHERE user_id=$1``SELECT username, photo FROM users 
+JOIN user_chats ON users.id = user_chat.user_id WHERE users.id <> $1 AND user_chats.user_id IN (user_chats.user_id='Kate');
