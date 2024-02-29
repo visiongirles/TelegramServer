@@ -6,15 +6,15 @@ import jwt from 'jsonwebtoken';
 import {
   requestCreateNewUserSQLRequest,
   requestPasswordAndSaltSQLRequest,
-  sqlrequest
+  reuqestUserInfoSQLRequest
 } from './SQLRequests/index.js';
 
 import config from './config.json'  with { type: "json" };
 
-import { addSocket, removeSocket, createToken, parseJwt, sha256} from './utils.js';
+import { addSocket, removeSocket, createToken, sha256} from './utils.js';
 
 
-import {getChatsPreview, getChatById, createNewMessage, deleteMessageById, fetchUserInfo} from './DBfunctions.js'
+import { getChatsPreview, getChatById, createNewMessage, deleteMessageById } from './DBfunctions.js'
 
 // MOCK DATA
 let authorization = false;
@@ -23,7 +23,8 @@ const SECRET = config.secret;
 const socketUpgradeURL = config.socketUpgradeURL;
 const socketUpgradeURLShort = config.socketUpgradeURLShort;
 
-export let webSocketConnection = new Map();
+// export let webSocketConnection = new Map();
+export let webSocketConnection = new Map(); //  Map<UserId,WSConnection[]>
 
 //  URL_WEBSOCKET обычно вытаскивают в .env файлы, хороший тон ( на будущее)
 
@@ -33,9 +34,7 @@ const app = express();
 // setup port for listening
 const port = process.env.PORT || config.port;
 
-// console.log('secret ', config.secret);
 const corsConfig = config.cors;
-// console.log('config.cors.origin ', corsConfig.origin);
 
 // allow CORS
 app.use(
@@ -50,22 +49,6 @@ app.use(
 // Start listening
 const server = app.listen(port, async () => {
   console.log('Server is listening');
-
-  // const values = ['1'];
-  // const sqlRequest = requestChatsPreviewSQLRequest2; // TODO: SQL salt && hashed password
-
-  // //
-  // try {
-  //   const result = await pool.query(sqlRequest, values);
-  //   console.log('New SQL result', result.rows);
-
- 
-  
-  // } catch (error) {
-  //   console.log('Incorrect SQL', error);
-  // }
-
-
 });
 
 // TODO: перенести все настйроки в json файл
@@ -88,14 +71,16 @@ app.post('/auth', express.json(), async (req, res) => {
 
     const hashedPasswordFromDB = result.rows[0].password;
     const salt = result.rows[0].salt;
+    const userId = result.rows[0].id;
     const hashedPasswordFromUser = sha256(password + salt);
     if (hashedPasswordFromUser === hashedPasswordFromDB) {
-      const userId = result.rows[0].id;
+ 
       const token = createToken(userId, SECRET);
-      console.log('authorization is changed to TRUE');
-
+      console.log('[/auth] authorization is changed to TRUE');
+      const values = [result.rows[0].id]
+      const userInfo = await pool.query(reuqestUserInfoSQLRequest, values);
       authorization = true;
-      res.status(200).send({ token: token, user_id: userId });
+      res.status(200).send({ token: token, user: userInfo.rows[0] });
     } else {
       throw Error;
     }
@@ -106,14 +91,17 @@ app.post('/auth', express.json(), async (req, res) => {
 });
 
 // Check authorization by Access Token
-app.post('/authByToken', express.json(), (req, res) => {
+app.post('/authByToken', express.json(), async (req, res) => {
   // TODO: проверить валидность токена
   const token = req.body.token;
   try {
     const userId = jwt.verify(token, SECRET).user_id.userId;
+    const values = [userId];
+    const userInfo = await pool.query(reuqestUserInfoSQLRequest, values);
+
     authorization = true;
-    console.log('authorization is changed to TRUE');
-    res.status(200).send({ token: token, user_id: userId });
+    console.log('[/authByToken] authorization is changed to TRUE');
+    res.status(200).send({ token: token, user: userInfo.rows[0] });
   } catch (err) {
     console.log(err.message);
     res.status(401).end('Invalid token');
@@ -185,14 +173,6 @@ websocketServer.on('connection', function connection(ws, request) {
 
       case 'get-chats-preview': {
         const result = await getChatsPreview(request.userId);
-        // const userInfo = await fetchUserInfo(request.userId);
-
-        // TODO: объелдинить резлдьтаты поисков. по user_id
-        // сейчас только chat_id есть в одном и user_id в другом
-        // const chatsPreview = result.map(item1 => {
-        //   const item2 = userInfo.find(item2 => item2.id === item1.id);
-        //   return { ...item1, ...item2 };
-        // });
 
         const data = {
           chatsPreview: [...result],
@@ -211,8 +191,11 @@ websocketServer.on('connection', function connection(ws, request) {
         break;
       }
       case 'create-new-message': {
+        const userId = webSocketConnection.get(ws);
+        console.log('[userId]: ', userId);
         const result = await createNewMessage(
           request.message.chat_id,
+          userId, 
           request.message.txt
         );
         const data = {
@@ -222,6 +205,9 @@ websocketServer.on('connection', function connection(ws, request) {
         };
 
         sendData(data, ws);
+        // ['socket': userId]
+        // [ws] =  webSocketConnection.get(ws)
+        // TODO: sendData(data, [])
         break;
       }
       case 'delete-message-by-id': {

@@ -3,8 +3,6 @@ import {
   requestChatByIdSQLRequest,
   requestCreateNewMessageSQLRequest,
   requestDeleteMessageByIdSQLRequest,
-  requestChatsPreviewUserInfoSQLRequest,
-  sqlrequest,
 } from './SQLRequests/index.js';
 
 import { pool } from './connection.js';
@@ -14,7 +12,6 @@ export async function fetchUserInfo(userId) {
   const values = [userId];
   try {
     const result = await pool.query(requestUserInfo, values);
-    console.log(['SQL result', result]);
     return result.rows;
   } catch (error) {
     console.error('Error executing query', error);
@@ -23,12 +20,11 @@ export async function fetchUserInfo(userId) {
 }
 
 export async function getChatsPreview(userId) {
-  const requestChatsPreview = sqlrequest;
+  const requestChatsPreview = requestChatsPreviewSQLRequest;
   const values = [userId];
 
   try {
     const result = await pool.query(requestChatsPreview, values);
-    console.log(['SQL result', result]);
 
     return result.rows;
   } catch (error) {
@@ -51,13 +47,14 @@ export async function getChatById(chatId) {
   }
 }
 
-export async function createNewMessage(chat_id, txt) {
-  const values = [chat_id, 1, txt, 'hasNotRead'];
+export async function createNewMessage(chat_id, userId, txt) {
+  const values = [chat_id, userId, txt, 'hasNotRead'];
 
   const requestCreateNewMessage = requestCreateNewMessageSQLRequest;
 
   try {
     const result = await pool.query(requestCreateNewMessage, values);
+    // console.log('[Create message result: ]', result.rows[0]);
     const object = {
       message: result.rows[0],
     };

@@ -4,13 +4,27 @@ import { webSocketConnection } from './server.js';
 
 const EXPIRATION_PERIOD = 60 * 60 * 48;
 
+// export function addSocket(webSocket, userId) {
+//   webSocketConnection.set(webSocket, userId);
+// }
+
+//  if(!webSocketSet){ webSocketSet=new Set() webSocketConnections.set(userId, webSocketSet) } webSocketSet.add(wsConnection)
+
 export function addSocket(webSocket, userId) {
-  webSocketConnection.set(webSocket, userId);
+  let webSocketArray = webSocketConnection.get(userId);
+  webSocketArray.add(webSocket);
+  webSocketConnection.set(userId, webSocketArray);
 }
 
-export function removeSocket(webSocket) {
-  webSocketConnection.delete(webSocket);
+export function removeSocket(webSocket, userId) {
+  let webSocketArray = webSocketConnection.get(userId);
+  webSocketArray.delete(webSocket);
+  webSocketConnection.set(userId, webSocketArray);
 }
+
+// export function removeSocket(webSocket) {
+//   webSocketConnection.delete(webSocket);
+// }
 
 // jwt-encode
 export function createToken(userId, secret) {
