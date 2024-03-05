@@ -11,15 +11,23 @@ const EXPIRATION_PERIOD = 60 * 60 * 48;
 //  if(!webSocketSet){ webSocketSet=new Set() webSocketConnections.set(userId, webSocketSet) } webSocketSet.add(wsConnection)
 
 export function addSocket(webSocket, userId) {
-  let webSocketArray = webSocketConnection.get(userId);
-  webSocketArray.add(webSocket);
-  webSocketConnection.set(userId, webSocketArray);
+  let webSocketSet = webSocketConnection.get(userId);
+  if (!webSocketSet) {
+    webSocketSet = new Set();
+    // console.log('I created Set', webSocketSet);
+  }
+  webSocketSet.add(webSocket);
+  webSocketConnection.set(userId, webSocketSet);
+  // console.log('[addSocket][webSocketConnection]', webSocketConnection);
 }
 
 export function removeSocket(webSocket, userId) {
-  let webSocketArray = webSocketConnection.get(userId);
-  webSocketArray.delete(webSocket);
-  webSocketConnection.set(userId, webSocketArray);
+  let webSocketSet = webSocketConnection.get(userId);
+  if (!webSocketSet) {
+    return;
+  }
+  webSocketSet.delete(webSocket);
+  webSocketConnection.set(userId, webSocketSet);
 }
 
 // export function removeSocket(webSocket) {
@@ -52,3 +60,7 @@ export function parseJwt(token) {
 export function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
+
+// export function notifyUsers(userIds) {
+
+// }

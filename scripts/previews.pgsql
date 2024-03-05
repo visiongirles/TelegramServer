@@ -1,1 +1,1 @@
-select * from users u join user_chats uc on u.id=uc.user_id join user_chats my_chats on uc.chat_id=my_chats.chat_id where my_chats.user_id = '1' AND u.id <> '1';
+SELECT user_id FROM user_chats WHERE chat_id=1 AND user_id <>1;

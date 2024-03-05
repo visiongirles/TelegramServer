@@ -21,6 +21,8 @@ ORDER BY chat_info.chat_id, messages.created_at DESC`;
 export const requestCreateNewMessageSQLRequest = `INSERT INTO messages (chat_id, created_at, author_id, txt, status)
 VALUES ($1, now(), $2, $3, $4) RETURNING *;`;
 
+export const requestSelectUpdatedChatsSQLRequest = `SELECT user_id FROM user_chats WHERE chat_id=$1 AND user_id <>$2;`;
+
 export const requestDeleteMessageByIdSQLRequest = `DELETE FROM messages WHERE chat_id=$1 AND id=$2`;
 
 // inner join user_chats uc on uc.user_id = $1

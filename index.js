@@ -55,33 +55,7 @@ function handleClient(thisClient, request) {
   thisClient.on('close', endClient);
 }
 
-// 4 websocket events: connection, error, messagem close
-// webSocketServer.on('connection', (ws) => {
-//   ws.on('message', (message) => {
-//     webSocketServer.clients.forEach((client) => client.send(m));
-//   });
-
-//   ws.on('error', (error) => ws.send(e));
-
-//   ws.send('Hi there, I am a WebSocket server');
-// });
-
 server.listen(PORT_HTTP, serverStart);
 
 // start the websocket server listening for clients:
 webSocketServer.on('connection', handleClient);
-
-// GET method route
-// app.get('/state', (req, res) => {
-//   res.send('hello world');
-// });
-
-// POST method route
-// app.post('/', (req, res) => {
-//   res.send('POST request to the homepage');
-// });
-
-// DELETE method route
-// app.delete('/', (req, res) => {
-//   res.send('POST request to the homepage');
-// });

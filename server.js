@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import {
   requestCreateNewUserSQLRequest,
   requestPasswordAndSaltSQLRequest,
-  reuqestUserInfoSQLRequest
+  reuqestUserInfoSQLRequest,
 } from './SQLRequests/index.js';
 
 import config from './config.json'  with { type: "json" };
@@ -14,7 +14,7 @@ import config from './config.json'  with { type: "json" };
 import { addSocket, removeSocket, createToken, sha256} from './utils.js';
 
 
-import { getChatsPreview, getChatById, createNewMessage, deleteMessageById } from './DBfunctions.js'
+import { getChatsPreview, getChatById, createNewMessage, deleteMessageById, findChatsToUpdate as findUserIdToUpdate } from './DBfunctions.js'
 
 // MOCK DATA
 let authorization = false;
@@ -24,9 +24,9 @@ const socketUpgradeURL = config.socketUpgradeURL;
 const socketUpgradeURLShort = config.socketUpgradeURLShort;
 
 // export let webSocketConnection = new Map();
-export let webSocketConnection = new Map(); //  Map<UserId,WSConnection[]>
+export let webSocketConnection = new Map(); //  Map<UserId,SetWSConnection[]>
+export let userIdWebSocketConnection = new Map(); //  Map<WSConnection,UserId>
 
-//  URL_WEBSOCKET обычно вытаскивают в .env файлы, хороший тон ( на будущее)
 
 // create HTTP server
 const app = express();
@@ -139,21 +139,13 @@ const websocketServer = new WebSocketServer({
 //Upgrade to sockets
 server.on('upgrade', (request, socket, head) => {
   console.log('Update to socket is made');
-  if (authorization) {
     websocketServer.handleUpgrade(request, socket, head, (websocket) => {
       websocketServer.emit('connection', websocket, request);
     });
-  }
+  
 });
 
-// to check if broken = https://www.npmjs.com/package/ws#how-to-detect-and-close-broken-connections
-
-// суть - создать слой с необходимым интерфейсом независящий от реализации протокола (ws в данном случае)
-// const user = connection;
-
-// можно сделать словарь
-// const requestDictionary = ['get-chats-preview', requestChatsPreview(..)]
-
+// send data to particular webSocket
 function sendData(data, ws) {
   const json = JSON.stringify(data);
   ws.send(json);
@@ -167,6 +159,7 @@ websocketServer.on('connection', function connection(ws, request) {
     switch (request.type) {
       case 'set-token': {
         const userId = jwt.verify(request.token, SECRET).user_id.userId;
+        userIdWebSocketConnection.set(ws, userId);
         addSocket(ws, userId);
         break;
       }
@@ -181,6 +174,7 @@ websocketServer.on('connection', function connection(ws, request) {
         sendData(data, ws);
         break;
       }
+
       case 'get-chat-by-id': {
         const result = await getChatById(request.chatId, ws);
         const data = {
@@ -190,37 +184,73 @@ websocketServer.on('connection', function connection(ws, request) {
         sendData(data, ws);
         break;
       }
+
       case 'create-new-message': {
-        const userId = webSocketConnection.get(ws);
-        console.log('[userId]: ', userId);
+        // userId of current websocket connection
+        const userId = userIdWebSocketConnection.get(ws); 
         const result = await createNewMessage(
           request.message.chat_id,
           userId, 
           request.message.txt
         );
+
+        // new message info
         const data = {
           type: request.type,
           chatId: request.message.chat_id,
           message: { ...result.message },
         };
 
+        // update current client
         sendData(data, ws);
-        // ['socket': userId]
-        // [ws] =  webSocketConnection.get(ws)
-        // TODO: sendData(data, [])
+
+        // array of all userId in relation to this conversation
+        const userIds = await findUserIdToUpdate(request.message.chat_id, userId);
+        userIds.map((userId) => {
+          // set of all websockets for each userId
+          const webSocketSet = webSocketConnection.get(userId.user_id);
+
+          // notify all active clients (websocket connections)
+          if (webSocketSet) {
+            for (let ws of webSocketSet) {
+              sendData(data, ws);
+            }
+          }
+        })
+  
         break;
       }
       case 'delete-message-by-id': {
         let result = await deleteMessageById(request.chatId, request.messageId);
-        // result.type = request.type;
         const data = { ...result, type: request.type };
+
+        // update current client
         sendData(data, ws);
+
+        const userId = userIdWebSocketConnection.get(ws);
+
+        // array of all userId in relation to this conversation
+        const userIds = await findUserIdToUpdate(request.chatId, userId);
+        userIds.map((userId) => {
+          // set of all websockets for each userId
+          const webSocketSet = webSocketConnection.get(userId.user_id);
+
+          // notify all active clients (websocket connections)
+          if (webSocketSet) {
+            for (let ws of webSocketSet) {
+              sendData(data, ws);
+            }
+          }
+        })
+
         break;
       }
     }
   });
   ws.on('close', function close() {
-    removeSocket(ws);
+    const userId = userIdWebSocketConnection.get(ws);
+    removeSocket(ws, userId);
+    userIdWebSocketConnection.delete(ws);
     console.log('[Closed websocket: ]', webSocketConnection);
   });
 });
