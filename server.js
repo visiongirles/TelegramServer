@@ -179,6 +179,7 @@ websocketServer.on('connection', function connection(ws, request) {
         const result = await getChatById(request.chatId, ws);
         const data = {
           messages: [...result],
+          chatId: request.chatId,
           type: request.type,
         };
         sendData(data, ws);
@@ -244,6 +245,10 @@ websocketServer.on('connection', function connection(ws, request) {
         })
 
         break;
+      }
+
+      case 'set-messages-read': {
+
       }
     }
   });
