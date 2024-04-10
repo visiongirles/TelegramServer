@@ -4,9 +4,9 @@ import { pool } from './connection.js';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import {
-  requestCreateNewUserSQLRequest,
-  requestPasswordAndSaltSQLRequest,
-  reuqestUserInfoSQLRequest,
+  createNewUserSQLRequest,
+  getPasswordAndSaltSQLRequest,
+  getUserInfoSQLRequest,
 } from './SQLRequests/index.js';
 
 import config from './config.json'  with { type: "json" };
@@ -14,13 +14,13 @@ import config from './config.json'  with { type: "json" };
 import { addSocket, removeSocket, createToken, sha256} from './utils.js';
 
 
-import { getChatsPreview, getChatById, createNewMessage, deleteMessageById, findChatsToUpdate as findUserIdToUpdate } from './DBfunctions.js'
+import { getChatsPreview, getChatById, createNewMessage, deleteMessageById, findChatsToUpdate as findUserIdToUpdate, setMessagesRead } from './DBfunctions.js'
 
 // MOCK DATA
 let authorization = false;
 // const SECRET = 'secret';
 const SECRET = config.secret;
-const socketUpgradeURL = config.socketUpgradeURL;
+// const socketUpgradeURL = config.socketUpgradeURL;
 const socketUpgradeURLShort = config.socketUpgradeURLShort;
 
 // export let webSocketConnection = new Map();
@@ -51,8 +51,6 @@ const server = app.listen(port, async () => {
   console.log('Server is listening');
 });
 
-// TODO: перенести все настйроки в json файл
-// не пароли , а хэши паролей
 //  readFileSync('.env', {encoding: 'utf-8' }).split('\n').map(s => s.indexOf()s.split('=').map(([k, v]) => process.env[k] = v)
 
 // Check authorization by Login and Password
@@ -63,7 +61,7 @@ app.post('/auth', express.json(), async (req, res) => {
   const password = req.body.password;
 
   const values = [username];
-  const sqlRequest = requestPasswordAndSaltSQLRequest; // TODO: SQL salt && hashed password
+  const sqlRequest = getPasswordAndSaltSQLRequest; 
 
   //
   try {
@@ -78,7 +76,7 @@ app.post('/auth', express.json(), async (req, res) => {
       const token = createToken(userId, SECRET);
       console.log('[/auth] authorization is changed to TRUE');
       const values = [result.rows[0].id]
-      const userInfo = await pool.query(reuqestUserInfoSQLRequest, values);
+      const userInfo = await pool.query(getUserInfoSQLRequest, values);
       authorization = true;
       res.status(200).send({ token: token, user: userInfo.rows[0] });
     } else {
@@ -92,12 +90,11 @@ app.post('/auth', express.json(), async (req, res) => {
 
 // Check authorization by Access Token
 app.post('/authByToken', express.json(), async (req, res) => {
-  // TODO: проверить валидность токена
   const token = req.body.token;
   try {
     const userId = jwt.verify(token, SECRET).user_id.userId;
     const values = [userId];
-    const userInfo = await pool.query(reuqestUserInfoSQLRequest, values);
+    const userInfo = await pool.query(getUserInfoSQLRequest, values);
 
     authorization = true;
     console.log('[/authByToken] authorization is changed to TRUE');
@@ -116,7 +113,7 @@ app.post('/register', express.json(), async (req, res) => {
   const salt = Math.random();
   const hashedPassword = sha256(password + salt);
   const values = [username, hashedPassword, salt];
-  const sqlRequest = requestCreateNewUserSQLRequest;
+  const sqlRequest = createNewUserSQLRequest;
   try {
     const result = await pool.query(sqlRequest, values);
     const user = { userId: result.id }; // TODO: user_id
@@ -176,6 +173,10 @@ websocketServer.on('connection', function connection(ws, request) {
       }
 
       case 'get-chat-by-id': {
+        const userId = userIdWebSocketConnection.get(ws); 
+
+        await setMessagesRead(request.chatId, userId);
+
         const result = await getChatById(request.chatId, ws);
         const data = {
           messages: [...result],
@@ -183,6 +184,22 @@ websocketServer.on('connection', function connection(ws, request) {
           type: request.type,
         };
         sendData(data, ws);
+
+
+        const userIds = await findUserIdToUpdate(request.chatId, userId);
+        userIds.map((userId) => {
+          // set of all websockets for each userId
+          const webSocketSet = webSocketConnection.get(userId.user_id);
+
+          // notify all active clients (websocket connections)
+          if (webSocketSet) {
+            for (let ws of webSocketSet) {
+              sendData(data, ws);
+            }
+          }
+        })
+
+
         break;
       }
 
@@ -247,15 +264,37 @@ websocketServer.on('connection', function connection(ws, request) {
         break;
       }
 
-      case 'set-messages-read': {
+      // case 'set-messages-read': {
+      //   const result = await setMessagesRead(request.readMessages.chatId, request.readMessages.messages);
+       
+      //   const data = { messages: result, type: request.type };
+      //   // console.log('[set-messages-read, data ]:', data);
+      //   // TODO: проверить как обновляю инфу по сокетам
+      //   const userId = userIdWebSocketConnection.get(ws);
 
-      }
+      //       // array of all userId in relation to this conversation
+      //       const userIds = await findUserIdToUpdate(request.chatId, userId);
+      //       userIds.map((userId) => {
+      //         // set of all websockets for each userId
+      //         const webSocketSet = webSocketConnection.get(userId.user_id);
+    
+      //         // notify all active clients (websocket connections)
+      //         if (webSocketSet) {
+      //           for (let ws of webSocketSet) {
+      //             console.log('I\'m about to send some data', data);
+      //             sendData(data, ws);
+      //           }
+      //         }
+      //       })
+    
+      //       break;
+      // }
     }
   });
   ws.on('close', function close() {
     const userId = userIdWebSocketConnection.get(ws);
     removeSocket(ws, userId);
     userIdWebSocketConnection.delete(ws);
-    console.log('[Closed websocket: ]', webSocketConnection);
+    // console.log('[Closed websocket: ]', webSocketConnection);
   });
 });

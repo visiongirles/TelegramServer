@@ -1,31 +1,19 @@
 import {
-  requestChatsPreviewSQLRequest,
-  requestChatByIdSQLRequest,
-  requestCreateNewMessageSQLRequest,
-  requestDeleteMessageByIdSQLRequest,
-  requestSelectUpdatedChatsSQLRequest,
+  getChatsPreviewSQLRequest,
+  getChatByIdSQLRequest,
+  createNewMessageSQLRequest,
+  deleteMessageByIdSQLRequest,
+  getChatsSQLRequest,
+  setMessageReadSQLRequest,
 } from './SQLRequests/index.js';
 
 import { pool } from './connection.js';
 
-// export async function fetchUserInfo(userId) {
-//   const requestUserInfo = requestChatsPreviewUserInfoSQLRequest;
-//   const values = [userId];
-//   try {
-//     const result = await pool.query(requestUserInfo, values);
-//     return result.rows;
-//   } catch (error) {
-//     console.error('Error executing query', error);
-//     return;
-//   }
-// }
-
 export async function getChatsPreview(userId) {
-  const requestChatsPreview = requestChatsPreviewSQLRequest;
   const values = [userId];
 
   try {
-    const result = await pool.query(requestChatsPreview, values);
+    const result = await pool.query(getChatsPreviewSQLRequest, values);
 
     return result.rows;
   } catch (error) {
@@ -34,16 +22,42 @@ export async function getChatsPreview(userId) {
   }
 }
 
+export async function setMessagesRead(chatId, userId) {
+  const values = [chatId, userId]; // messageId in SQL query
+  console.log('values: ', values);
+
+  try {
+    await pool.query(setMessageReadSQLRequest, values);
+    return;
+  } catch (error) {
+    console.error('[setMessagesRead] Error executing query', error);
+    return;
+  }
+}
+
+// export async function setMessagesRead(chatId, messages) {
+//   const messageIds = messages.map((message) => message.id);
+//   const values = [chatId, messageIds];
+//   const requestMessageRead = messageReadSQLRequest;
+
+//   try {
+//     const result = await pool.query(requestMessageRead, values);
+//     return result.rows;
+//   } catch (error) {
+//     console.error('[setMessagesRead] Error executing query', error);
+//   }
+// }
+
 export async function getChatById(chatId) {
   const values = [chatId];
-  const requestChatById = requestChatByIdSQLRequest;
+  const requestChatById = getChatByIdSQLRequest;
 
   try {
     const result = await pool.query(requestChatById, values);
 
     return result.rows;
   } catch (error) {
-    console.error('Error executing query', err);
+    console.error('[getChatById] Error executing query', err);
     return;
   }
 }
@@ -52,14 +66,11 @@ export async function findChatsToUpdate(chat_id, userId) {
   const values = [chat_id, userId];
 
   try {
-    const result = await pool.query(
-      requestSelectUpdatedChatsSQLRequest,
-      values
-    );
+    const result = await pool.query(getChatsSQLRequest, values);
 
     return result.rows;
   } catch (error) {
-    console.error('Error executing query', err);
+    console.error('[findChatsToUpdate] Error executing query', err);
     return;
   }
 }
@@ -67,7 +78,7 @@ export async function findChatsToUpdate(chat_id, userId) {
 export async function createNewMessage(chat_id, userId, txt) {
   const values = [chat_id, userId, txt, 'hasNotRead'];
 
-  const requestCreateNewMessage = requestCreateNewMessageSQLRequest;
+  const requestCreateNewMessage = createNewMessageSQLRequest;
 
   try {
     const result = await pool.query(requestCreateNewMessage, values);
@@ -78,14 +89,14 @@ export async function createNewMessage(chat_id, userId, txt) {
     };
     return object;
   } catch (error) {
-    console.error('Error executing query', error);
+    console.error('[createNewMessage] Error executing query', error);
     return;
   }
 }
 
 export async function deleteMessageById(chatId, messageId) {
   const values = [chatId, messageId];
-  const requestDeleteMessageById = requestDeleteMessageByIdSQLRequest;
+  const requestDeleteMessageById = deleteMessageByIdSQLRequest;
 
   try {
     await pool.query(requestDeleteMessageById, values);
@@ -97,6 +108,6 @@ export async function deleteMessageById(chatId, messageId) {
     };
     return result;
   } catch (error) {
-    console.error('Error executing query', error);
+    console.error('[deleteMessageById] Error executing query', error);
   }
 }
