@@ -185,14 +185,20 @@ websocketServer.on('connection', function connection(ws, request) {
         };
         sendData(data, ws);
 
-
-        const userIds = await findUserIdToUpdate(request.chatId, userId);
-        userIds.map((userId) => {
+        //TODO: нужно правильной событие, чтобы обновить сокеты
+        const userIdsToUpdate = await findUserIdToUpdate(request.chatId, userId);
+        userIdsToUpdate.map((userId) => {
           // set of all websockets for each userId
-          const webSocketSet = webSocketConnection.get(userId.user_id);
+          const webSocketSet = webSocketConnection.get(userId);
 
           // notify all active clients (websocket connections)
           if (webSocketSet) {
+
+            const data = {
+              messages: [...result],
+              chatId: request.chatId,
+              type: '',
+            };
             for (let ws of webSocketSet) {
               sendData(data, ws);
             }
@@ -226,7 +232,7 @@ websocketServer.on('connection', function connection(ws, request) {
         const userIds = await findUserIdToUpdate(request.message.chat_id, userId);
         userIds.map((userId) => {
           // set of all websockets for each userId
-          const webSocketSet = webSocketConnection.get(userId.user_id);
+          const webSocketSet = webSocketConnection.get(userId);
 
           // notify all active clients (websocket connections)
           if (webSocketSet) {
@@ -251,7 +257,7 @@ websocketServer.on('connection', function connection(ws, request) {
         const userIds = await findUserIdToUpdate(request.chatId, userId);
         userIds.map((userId) => {
           // set of all websockets for each userId
-          const webSocketSet = webSocketConnection.get(userId.user_id);
+          const webSocketSet = webSocketConnection.get(userId);
 
           // notify all active clients (websocket connections)
           if (webSocketSet) {

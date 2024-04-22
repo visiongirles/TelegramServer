@@ -67,8 +67,12 @@ export async function findChatsToUpdate(chat_id, userId) {
 
   try {
     const result = await pool.query(getChatsSQLRequest, values);
-
-    return result.rows;
+    console.log(
+      '[findChatsToUpdate(chat_id, userId)] result.rows: ',
+      result.rows
+    );
+    const userIds = result.rows.map((item) => item.user_id);
+    return userIds;
   } catch (error) {
     console.error('[findChatsToUpdate] Error executing query', err);
     return;
