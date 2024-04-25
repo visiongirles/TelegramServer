@@ -187,7 +187,7 @@ websocketServer.on('connection', function connection(ws, request) {
 
         //TODO: нужно правильной событие, чтобы обновить сокеты
         const userIdsToUpdate = await findUserIdToUpdate(request.chatId, userId);
-        userIdsToUpdate.map((userId) => {
+        userIdsToUpdate.forEach((userId) => {
           // set of all websockets for each userId
           const webSocketSet = webSocketConnection.get(userId);
 
@@ -197,7 +197,7 @@ websocketServer.on('connection', function connection(ws, request) {
             const data = {
               messages: [...result],
               chatId: request.chatId,
-              type: '',
+              type: "set-chat-by-id",
             };
             for (let ws of webSocketSet) {
               sendData(data, ws);
@@ -230,7 +230,7 @@ websocketServer.on('connection', function connection(ws, request) {
 
         // array of all userId in relation to this conversation
         const userIds = await findUserIdToUpdate(request.message.chat_id, userId);
-        userIds.map((userId) => {
+        userIds.forEach((userId) => {
           // set of all websockets for each userId
           const webSocketSet = webSocketConnection.get(userId);
 
@@ -255,7 +255,7 @@ websocketServer.on('connection', function connection(ws, request) {
 
         // array of all userId in relation to this conversation
         const userIds = await findUserIdToUpdate(request.chatId, userId);
-        userIds.map((userId) => {
+        userIds.forEach((userId) => {
           // set of all websockets for each userId
           const webSocketSet = webSocketConnection.get(userId);
 

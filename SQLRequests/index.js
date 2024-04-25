@@ -17,7 +17,7 @@ FROM  (
             where uc2.user_id <> $1) as usr_chats
         on u.id = usr_chats.user_id
 ) as chat_info 
-INNER JOIN messages ON messages.chat_id=chat_info.chat_id 
+LEFT JOIN messages ON messages.chat_id=chat_info.chat_id 
 ORDER BY chat_info.chat_id, messages.created_at DESC`;
 
 export const createNewMessageSQLRequest = `INSERT INTO messages (chat_id, created_at, author_id, txt, status)
