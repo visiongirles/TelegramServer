@@ -9,12 +9,18 @@ import {
   getUserInfoSQLRequest,
 } from './SQLRequests/index.js';
 
-import config from './config.json'  with { type: "json" };
+import config from './config.json' assert { type: 'json' };
 
-import { addSocket, removeSocket, createToken, sha256} from './utils.js';
+import { addSocket, removeSocket, createToken, sha256 } from './utils.js';
 
-
-import { getChatsPreview, getChatById, createNewMessage, deleteMessageById, findChatsToUpdate as findUserIdToUpdate, setMessagesRead } from './DBfunctions.js'
+import {
+  getChatsPreview,
+  getChatById,
+  createNewMessage,
+  deleteMessageById,
+  findChatsToUpdate as findUserIdToUpdate,
+  setMessagesRead,
+} from './DBfunctions.js';
 
 // MOCK DATA
 let authorization = false;
@@ -27,12 +33,11 @@ const socketUpgradeURLShort = config.socketUpgradeURLShort;
 export let webSocketConnection = new Map(); //  Map<UserId,SetWSConnection[]>
 export let userIdWebSocketConnection = new Map(); //  Map<WSConnection,UserId>
 
-
 // create HTTP server
 const app = express();
 
 // setup port for listening
-const port = process.env.PORT || config.port;
+const port = config.port || process.env.PORT;
 
 const corsConfig = config.cors;
 
@@ -61,7 +66,7 @@ app.post('/auth', express.json(), async (req, res) => {
   const password = req.body.password;
 
   const values = [username];
-  const sqlRequest = getPasswordAndSaltSQLRequest; 
+  const sqlRequest = getPasswordAndSaltSQLRequest;
 
   //
   try {
@@ -72,11 +77,12 @@ app.post('/auth', express.json(), async (req, res) => {
     const userId = result.rows[0].id;
     const hashedPasswordFromUser = sha256(password + salt);
     if (hashedPasswordFromUser === hashedPasswordFromDB) {
- 
       const token = createToken(userId, SECRET);
       console.log('[/auth] authorization is changed to TRUE');
-      const values = [result.rows[0].id]
+
+      const values = [result.rows[0].id];
       const userInfo = await pool.query(getUserInfoSQLRequest, values);
+
       authorization = true;
       res.status(200).send({ token: token, user: userInfo.rows[0] });
     } else {
@@ -136,10 +142,9 @@ const websocketServer = new WebSocketServer({
 //Upgrade to sockets
 server.on('upgrade', (request, socket, head) => {
   console.log('Update to socket is made');
-    websocketServer.handleUpgrade(request, socket, head, (websocket) => {
-      websocketServer.emit('connection', websocket, request);
-    });
-  
+  websocketServer.handleUpgrade(request, socket, head, (websocket) => {
+    websocketServer.emit('connection', websocket, request);
+  });
 });
 
 // send data to particular webSocket
@@ -173,7 +178,7 @@ websocketServer.on('connection', function connection(ws, request) {
       }
 
       case 'get-chat-by-id': {
-        const userId = userIdWebSocketConnection.get(ws); 
+        const userId = userIdWebSocketConnection.get(ws);
 
         await setMessagesRead(request.chatId, userId);
 
@@ -186,35 +191,36 @@ websocketServer.on('connection', function connection(ws, request) {
         sendData(data, ws);
 
         //TODO: нужно правильной событие, чтобы обновить сокеты
-        const userIdsToUpdate = await findUserIdToUpdate(request.chatId, userId);
+        const userIdsToUpdate = await findUserIdToUpdate(
+          request.chatId,
+          userId
+        );
         userIdsToUpdate.forEach((userId) => {
           // set of all websockets for each userId
           const webSocketSet = webSocketConnection.get(userId);
 
           // notify all active clients (websocket connections)
           if (webSocketSet) {
-
             const data = {
               messages: [...result],
               chatId: request.chatId,
-              type: "set-chat-by-id",
+              type: 'set-chat-by-id',
             };
             for (let ws of webSocketSet) {
               sendData(data, ws);
             }
           }
-        })
-
+        });
 
         break;
       }
 
       case 'create-new-message': {
         // userId of current websocket connection
-        const userId = userIdWebSocketConnection.get(ws); 
+        const userId = userIdWebSocketConnection.get(ws);
         const result = await createNewMessage(
           request.message.chat_id,
-          userId, 
+          userId,
           request.message.txt
         );
 
@@ -229,7 +235,10 @@ websocketServer.on('connection', function connection(ws, request) {
         sendData(data, ws);
 
         // array of all userId in relation to this conversation
-        const userIds = await findUserIdToUpdate(request.message.chat_id, userId);
+        const userIds = await findUserIdToUpdate(
+          request.message.chat_id,
+          userId
+        );
         userIds.forEach((userId) => {
           // set of all websockets for each userId
           const webSocketSet = webSocketConnection.get(userId);
@@ -240,8 +249,8 @@ websocketServer.on('connection', function connection(ws, request) {
               sendData(data, ws);
             }
           }
-        })
-  
+        });
+
         break;
       }
       case 'delete-message-by-id': {
@@ -265,36 +274,10 @@ websocketServer.on('connection', function connection(ws, request) {
               sendData(data, ws);
             }
           }
-        })
+        });
 
         break;
       }
-
-      // case 'set-messages-read': {
-      //   const result = await setMessagesRead(request.readMessages.chatId, request.readMessages.messages);
-       
-      //   const data = { messages: result, type: request.type };
-      //   // console.log('[set-messages-read, data ]:', data);
-      //   // TODO: проверить как обновляю инфу по сокетам
-      //   const userId = userIdWebSocketConnection.get(ws);
-
-      //       // array of all userId in relation to this conversation
-      //       const userIds = await findUserIdToUpdate(request.chatId, userId);
-      //       userIds.map((userId) => {
-      //         // set of all websockets for each userId
-      //         const webSocketSet = webSocketConnection.get(userId.user_id);
-    
-      //         // notify all active clients (websocket connections)
-      //         if (webSocketSet) {
-      //           for (let ws of webSocketSet) {
-      //             console.log('I\'m about to send some data', data);
-      //             sendData(data, ws);
-      //           }
-      //         }
-      //       })
-    
-      //       break;
-      // }
     }
   });
   ws.on('close', function close() {

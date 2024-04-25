@@ -1,5 +1,5 @@
--- DROP DATABASE IF EXISTS telegram;
--- CREATE DATABASE telegram;
+DROP DATABASE IF EXISTS telegram;
+CREATE DATABASE telegram;
 
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS user_chats;
