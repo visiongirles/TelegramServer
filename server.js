@@ -20,6 +20,7 @@ import {
   deleteMessageById,
   findChatsToUpdate as findUserIdToUpdate,
   setMessagesRead,
+  updateEditedMessage,
 } from './DBfunctions.js';
 
 // MOCK DATA
@@ -168,6 +169,8 @@ websocketServer.on('connection', function connection(ws, request) {
 
       case 'get-chats-preview': {
         const result = await getChatsPreview(request.userId);
+        console.log('[get-chats-preview]: ', result);
+        // const unreadMessagesCount = await getUnreadMessagesCount();
 
         const data = {
           chatsPreview: [...result],
@@ -277,6 +280,45 @@ websocketServer.on('connection', function connection(ws, request) {
         });
 
         break;
+      }
+
+      case 'edit-message': {
+        const userId = userIdWebSocketConnection.get(ws);
+        const result = await updateEditedMessage(
+          request.message.chat_id,
+          userId,
+          request.message.message_id,
+          request.message.txt
+        );
+
+        // new message info
+        const data = {
+          type: request.type,
+          chatId: request.message.chat_id,
+          messageId: request.message.message_id,
+          message: { ...result },
+        };
+
+        console.log("['edit-message']Server to send data: ", data);
+        // update current client
+        sendData(data, ws);
+
+        // array of all userId in relation to this conversation
+        const userIds = await findUserIdToUpdate(
+          request.message.chat_id,
+          userId
+        );
+        userIds.forEach((userId) => {
+          // set of all websockets for each userId
+          const webSocketSet = webSocketConnection.get(userId);
+
+          // notify all active clients (websocket connections)
+          if (webSocketSet) {
+            for (let ws of webSocketSet) {
+              sendData(data, ws);
+            }
+          }
+        });
       }
     }
   });

@@ -1,0 +1,1 @@
+SELECT COUNT(*) FROM messages WHERE chat_id=1 AND author_id <>1 AND status='hasNotRead';
