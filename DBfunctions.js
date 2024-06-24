@@ -5,8 +5,7 @@ import {
   getChatsSQLRequest,
   setMessageReadSQLRequest,
   updateMessageSQLRequest,
-  unreadMessagesCountSQLRequest,
-  getChatsPreviewAndUnreadMessagesCountSQLRequest,
+  getChatsPreviewSQLRequest,
 } from './SQLRequests/index.js';
 
 import { pool } from './connection.js';
@@ -15,10 +14,7 @@ export async function getChatsPreview(userId) {
   const values = [userId];
 
   try {
-    const result = await pool.query(
-      getChatsPreviewAndUnreadMessagesCountSQLRequest,
-      values
-    );
+    const result = await pool.query(getChatsPreviewSQLRequest, values);
     console.log('New preview result: ', result.rows);
     return result.rows;
   } catch (error) {
@@ -44,8 +40,6 @@ export async function updateEditedMessage(chatId, userId, messageId, txt) {
   const values = [chatId, userId, messageId, txt];
   try {
     const result = await pool.query(updateMessageSQLRequest, values);
-    // console.log('RESULT FROM EDIT MESSAGE EVENT: ', result);
-    // console.log('RESULT FROM EDIT MESSAGE EVENT rows: ', result.rows);
     return result.rows[0];
   } catch (error) {
     console.error('[updateEditedMessage] Error executing query', error);
@@ -88,8 +82,6 @@ export async function createNewMessage(chat_id, userId, txt) {
 
   try {
     const result = await pool.query(requestCreateNewMessage, values);
-
-    // console.log('[Create message result: ]', result.rows[0]);
     const object = {
       message: result.rows[0],
     };
@@ -114,17 +106,5 @@ export async function deleteMessageById(chatId, messageId) {
     return result;
   } catch (error) {
     console.error('[deleteMessageById] Error executing query', error);
-  }
-}
-
-export async function getUnreadMessagesCount(chatId, userId) {
-  const values = [chatId, userId];
-
-  try {
-    const result = await pool.query(unreadMessagesCountSQLRequest, values);
-
-    return result;
-  } catch (error) {
-    console.error('[getUnreadMessagesCount] Error executing query', error);
   }
 }

@@ -193,7 +193,7 @@ websocketServer.on('connection', function connection(ws, request) {
         };
         sendData(data, ws);
 
-        //TODO: нужно правильной событие, чтобы обновить сокеты
+        //TODO: нужно правильное событие, чтобы обновить сокеты
         const userIdsToUpdate = await findUserIdToUpdate(
           request.chatId,
           userId
